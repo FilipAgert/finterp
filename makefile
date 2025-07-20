@@ -17,7 +17,8 @@ MAIN_OBJ = $(DOBJ)/main.o
 
 VPATH = $(DSRC):$(DTEST):$(DSRC)/$(DSH)
 
-$(DOBJ)/main.o: $(DSRC)/main.f90 $(DOBJ)/quad.o
+$(DOBJ)/main.o: $(DSRC)/main.f90 $(DOBJ)/interp.o 
+$(DOBJ)/interp.o: $(DSRC)/interp.f90 
 
 # Default target
 
