@@ -8,6 +8,16 @@ module interp
     
     
     real(kind=kind) function lin_int(x, xs, ys) 
+        !! Linearly interpolates the function value at a given point x.
+        !!
+        !! Given two arrays `xs` and `ys` (of the same size), representing
+        !! sample points of a function `y = f(x)`, this function estimates
+        !! the value at a point `x` using linear interpolation.
+        !!
+        !! The input array `xs` must be sorted in ascending order.
+        !! The value of `x` must lie within the bounds of `xs`.
+        !!
+        !! Author: Filip Agert, 2025
         real(kind), intent(in) :: x !!Point to interpolate at. 
         real(kind), intent(in) :: xs(:) !!x coordinates. Must be sorted.
         real(kind), intent(in) :: ys(:) !!y coordinates
