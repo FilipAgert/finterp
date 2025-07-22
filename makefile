@@ -6,7 +6,7 @@ DMOD = mod
 EXEN = finterp
 all: $(DEXE)/$(EXEN)
 # Flags
-LIBS = 
+LIBS = -llapack
 FLAGS = -O3 -I$(DOBJ) -I$(DMOD) -fcheck=all -fbacktrace -g -ffree-line-length-none -fimplicit-none
 CC = gfortran $(FLAGS) -J$(DMOD) $(LIBS) -c
 CCL = gfortran -o
