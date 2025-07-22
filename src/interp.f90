@@ -5,45 +5,58 @@ module interp
     public :: kind, linspace, cubic_spline, lin_interpolator
 
     type, abstract :: interpolator
-        real(kind), allocatable :: xs(:) !!x coordinates. Must be sorted.
-        real(kind), allocatable :: ys(:) !!y coordinates
-        logical :: is_setup = .false.
+        real(kind), private, allocatable :: xs(:) !!x coordinates. Must be sorted.
+        real(kind), private, allocatable :: ys(:) !!y coordinates
+        logical, private :: is_setup = .false.
         contains
-        procedure(eval_interpolator), deferred :: eval !!Evaluate the interpolator at a given point
+        procedure :: eval => eval_interp !!Evaluate the interpolator at a given point
+        procedure(eval_idx_interface),deferred, private:: eval_idx!!Evaluate the interpolator at a given point
         procedure(setup_interpolator), deferred :: setup !!Setup the interpolator with given xs and ys
     end type interpolator
 
     type, extends(interpolator) :: cubic_spline
-        real(kind), allocatable :: coeffs(:)
+        real(kind), private, allocatable :: coeffs(:)
 
         contains
-        procedure, pass(self) :: eval => eval_cubic_spline
+        procedure, pass(self), private :: eval_idx => eval_cubic_spline
         procedure, pass(self) :: setup => setup_cubic_spline
     end type cubic_spline
 
 
     type, extends(interpolator) :: lin_interpolator
         contains
-        procedure, pass(self) :: eval => eval_linear_interpolator
+        procedure, pass(self), private :: eval_idx => eval_linear_interpolator
         procedure, pass(self) :: setup => setup_linear_interpolator
     end type lin_interpolator
 
 
     abstract interface
-        pure elemental real(kind) function eval_interpolator(self, x)
-            import:: interpolator, kind
-            class(interpolator), intent(in) :: self
-            real(kind), intent(in) :: x
-        end function
-
         subroutine setup_interpolator(self, xs, ys)
             import:: interpolator, kind
             class(interpolator), intent(inout) :: self
             real(kind), intent(in) :: xs(:) !!x coordinates. Must be sorted.
             real(kind), intent(in) :: ys(:) !!y coordinates
         end subroutine
+
+        !!Idx is the index of the last element in xs smaller than or equal to x.
+        pure elemental real(kind) function eval_idx_interface(self, x, idx)
+            import :: kind, interpolator
+            class(interpolator), intent(in) :: self
+            real(kind), intent(in) :: x
+            integer, intent(in) :: idx
+
+        end function
     end interface 
     contains
+    pure elemental real(kind) function eval_interp(self, x)
+        class(interpolator), intent(in) :: self
+        real(kind), intent(in) :: x
+        integer :: idx
+        if(.not. self%is_setup) error stop "interpolator not setup, call setup first"
+        if(x > maxval(self%xs,1) .or. x < minval(self%xs,1)) error stop "input value not within bounds of input array"
+        idx = maxloc(self%xs - x, 1, mask=self%xs <= x) !!Idx of the element smaller than or equal to x
+        eval_interp = self%eval_idx(x, idx)
+    end function
     subroutine setup_cubic_spline(self, xs, ys)
         class(cubic_spline), intent(inout) :: self
         real(kind), intent(in) :: xs(:) !!x coordinates. Must be sorted.
@@ -60,23 +73,14 @@ module interp
         self%is_setup = .true.
     end subroutine setup_cubic_spline
 
-    pure real(kind) elemental function eval_cubic_spline(self, x)
+    pure real(kind) elemental function eval_cubic_spline(self, x, idx)
         class(cubic_spline), intent(in) :: self
         real(kind), intent(in) :: x
-        integer :: ii
-        if(x > maxval(self%xs,1) .or. x < minval(self%xs,1)) error stop "input value not within bounds of input array"
-        if(.not. self%is_setup) error stop "cubic spline not setup, call setup_cubic_spline first"
-        do ii = 1, size(self%xs)-1
-            if(x >= self%xs(ii) .and. x< self%xs(ii+1)) then
-                !We have a segment between xs(ii) and xs(ii+1)
-                !Evaluate the cubic polynomial at x
-                eval_cubic_spline = self%coeffs((ii-1)*4 + 1) * x**3 + &
-                                    self%coeffs((ii-1)*4 + 2) * x**2 + &
-                                    self%coeffs((ii-1)*4 + 3) * x + &
-                                    self%coeffs((ii-1)*4 + 4)
-                return
-            endif
-        end do
+        integer, intent(in) :: idx
+        eval_cubic_spline = self%coeffs((idx-1)*4 + 1) * x**3 + &
+                            self%coeffs((idx-1)*4 + 2) * x**2 + &
+                            self%coeffs((idx-1)*4 + 3) * x + &
+                            self%coeffs((idx-1)*4 + 4)
     end function 
     
     function q_spline_coeffs(xs, ys)
@@ -210,20 +214,12 @@ module interp
         self%is_setup = .true.
     end subroutine setup_linear_interpolator
 
-    pure real(kind) elemental function eval_linear_interpolator(self, x)
+    pure real(kind) elemental function eval_linear_interpolator(self, x, idx)
         class(lin_interpolator), intent(in) :: self
         real(kind), intent(in) :: x
-        integer :: ii
-        if(x > maxval(self%xs,1) .or. x < minval(self%xs,1)) error stop "input value not within bounds of input array"
-        if(.not. self%is_setup) error stop "linear interpolator not setup, call setup first"
-        do ii = 1, size(self%xs)-1
-            if(x >= self%xs(ii) .and. x < self%xs(ii+1)) then
-                !We have a segment between xs(ii) and xs(ii+1)
-                !Evaluate the linear interpolator at x
-                eval_linear_interpolator = lerp(x, self%xs(ii), self%ys(ii), self%xs(ii+1), self%ys(ii+1))
-                return
-            endif
-        end do
+        integer, intent(in) :: idx
+        eval_linear_interpolator = lerp(x, self%xs(idx), self%ys(idx), self%xs(idx+1), self%ys(idx+1))
+
     end function 
     
 end module
